@@ -1,6 +1,9 @@
 <resources>
     <string name="app_name">ConndeApp</string>
     <string name="msg_welcome">Welcome to the ConndeApp</string>
-    <string name="btn_listSensors">List Sensors</string>
+    <string name="btn_listSensors">Sensors</string>
     <string name="msg_model">Your model is: %1$s</string>
+    <string name="btn_startAdvertising">Start Advertise</string>
+    <string name="btn_deployConf">Deploy Conf</string>
+    <string name="btn_stopAdvertising">Stop Advertise</string>
 </resources>

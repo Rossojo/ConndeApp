@@ -99,4 +99,9 @@ public class AdvertiseDevice {
   public void setType(String type) {
     this.type = type;
   }
+
+  @Override
+  public String toString() {
+    return localId + "|" + type + "|" + globalId + "|" + (host != null? host.globalId : "") + "|" + (connected? "connected" : "unconnected");
+  }
 }

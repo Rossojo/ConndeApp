@@ -8,14 +8,17 @@ import android.hardware.Sensor;
 import android.hardware.SensorManager;
 import android.net.DhcpInfo;
 import android.net.NetworkInfo;
+import android.net.wifi.ScanResult;
 import android.net.wifi.WifiManager;
 import android.os.Build;
-import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
+import android.widget.Button;
 import android.widget.TextView;
 
+import org.citopt.connde.conndeapp.advertise.AdvertiseDevice;
 import org.citopt.connde.conndeapp.advertise.AdvertiseService;
 import org.citopt.connde.conndeapp.advertise.Const;
 import org.json.JSONArray;
@@ -31,6 +34,7 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetAddress;
 import java.nio.charset.Charset;
+import java.util.Collection;
 import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
@@ -65,7 +69,7 @@ public class MainActivity extends AppCompatActivity {
   @Override
   protected void onPause() {
     super.onPause();
-    if(advertiseService!=null){
+    if (advertiseService != null) {
       try {
         advertiseService.stop();
       } catch (JSONException e) {
@@ -78,7 +82,7 @@ public class MainActivity extends AppCompatActivity {
     File filesDir = getApplicationContext().getFilesDir();
 
     File autodeployFile = new File(filesDir, Const.AUTODEPLOY_FILE);
-    if (!autodeployFile.exists()){
+    if (!autodeployFile.exists()) {
       Log.i(TAG, "Generating autodeploy file");
       mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
       List<Sensor> sensors = mSensorManager.getSensorList(Sensor.TYPE_ALL);
@@ -97,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
 
       JSONArray deployDevices = new JSONArray();
       for (Sensor sensor : sensors) {
-        JSONObject jsonSensor= new JSONObject();
+        JSONObject jsonSensor = new JSONObject();
         jsonSensor.put(Const.LOCAL_ID, sensor.getName());
         jsonSensor.put(Const.TYPE, getStringType(sensor.getType()));
 
@@ -110,7 +114,7 @@ public class MainActivity extends AppCompatActivity {
       autodeployConf.put(Const.DEPLOY_DEVICES, deployDevices);
 
       String jsonString = autodeployConf.toString(2);
-      try(OutputStream os= new FileOutputStream(autodeployFile)){
+      try (OutputStream os = new FileOutputStream(autodeployFile)) {
         os.write(jsonString.getBytes(Charset.forName("UTF-8")));
         os.flush();
       } catch (FileNotFoundException e) {
@@ -119,19 +123,19 @@ public class MainActivity extends AppCompatActivity {
         e.printStackTrace();
       }
       Log.i(TAG, "Successfully generated autodeploy file |\n" + autodeployConf.toString(4) + "\n|");
-    }else {
+    } else {
       Log.w(TAG, "Autodeploy file exists");
     }
   }
 
-  private String getStringType(int sensorType){
-    switch(sensorType){
+  private String getStringType(int sensorType) {
+    switch (sensorType) {
       case Sensor.TYPE_ACCELEROMETER:
         return Sensor.STRING_TYPE_ACCELEROMETER;
       case Sensor.TYPE_ACCELEROMETER_UNCALIBRATED:
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
           return Sensor.STRING_TYPE_ACCELEROMETER_UNCALIBRATED;
-        }else{
+        } else {
           return "android.sensor.accelerometer_uncalibrated";
         }
       case Sensor.TYPE_AMBIENT_TEMPERATURE:
@@ -151,7 +155,7 @@ public class MainActivity extends AppCompatActivity {
       case Sensor.TYPE_HEART_BEAT:
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
           return Sensor.STRING_TYPE_HEART_BEAT;
-        }else{
+        } else {
           return "android.sensor.heart_beat";
         }
       case Sensor.TYPE_HEART_RATE:
@@ -203,40 +207,100 @@ public class MainActivity extends AppCompatActivity {
       if (netInfo.getState() == NetworkInfo.State.CONNECTED) {
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
         String ssid = wifiManager.getConnectionInfo().getSSID();
-        if(ssid != null && !ssid.equals(curSsid)) {
+        if (ssid != null && !ssid.equals(curSsid)) {
           Log.i(TAG, "Connected to |" + ssid + "|");
           curSsid = ssid;
-          try {
-            advertiseService = new AdvertiseService(getFilesDir());
-          } catch (JSONException e) {
-            Log.d(TAG, "Error constructing advertising service", e);
-          }
-          new Thread(new Runnable() {
-            @Override
-            public void run() {
-              try {
-                advertiseService.start("android");
-              } catch (JSONException e) {
-                Log.e(TAG, "Error starting advertising service", e);
-              }
-            }
-          }).start();
+//          try {
+//            advertiseService = new AdvertiseService(getFilesDir());
+//          } catch (JSONException e) {
+//            Log.e(TAG, "Error constructing advertising service", e);
+//          }
+//          new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+//              try {
+//                advertiseService.start("android");
+//              } catch (JSONException e) {
+//                Log.e(TAG, "Error starting advertising service", e);
+//              }
+//            }
+//          }).start();
         }
       } else {
         Log.d(TAG, "No Connection");
         curSsid = null;
-          if(advertiseService != null) {
-            try {
-              advertiseService.stop();
-            } catch (JSONException e) {
-              Log.e(TAG, "Error stopping advertising service", e);
-            }
-          }
+//        if (advertiseService != null) {
+//          try {
+//            advertiseService.stop();
+//          } catch (JSONException e) {
+//            Log.e(TAG, "Error stopping advertising service", e);
+//          }
+//        }
       }
     }
   }
 
-  public void listSensors(View view) {
+  public void toggleAdvertising(View view) {
+    if (advertiseService == null) {
+      try {
+        advertiseService = new AdvertiseService(getFilesDir());
+        new Thread(new Runnable() {
+          @Override
+          public void run() {
+            try {
+              advertiseService.start("android");
+            } catch (JSONException e) {
+              Log.e(TAG, "Error starting advertising service", e);
+            }
+          }
+        }).start();
+
+        ((Button) view).setText(getString(R.string.btn_stopAdvertising));
+      } catch (JSONException e) {
+        Log.e(TAG, "Error constructing advertising service", e);
+      }
+    } else {
+      try {
+        advertiseService.stop();
+        advertiseService = null;
+        ((Button) view).setText(getString(R.string.btn_startAdvertising));
+      } catch (JSONException e) {
+        Log.e(TAG, "Error stopping advertising service", e);
+      }
+    }
+
+    String buttonText = advertiseService == null ? getString(R.string.btn_startAdvertising) : getString(R.string.btn_stopAdvertising);
+    Button toggleButton = (Button) findViewById(R.id.btnToggleAdvertise);
+    toggleButton.setText(buttonText);
+  }
+
+  public void showSensorOverview(View view) {
+    StringBuilder overview = new StringBuilder();
+    if (advertiseService != null) {
+      AdvertiseDevice host = advertiseService.getHost();
+      Collection<AdvertiseDevice> devices = advertiseService.getDevices().values();
+
+      if (host != null && host.isConnected()) {
+        overview.append("Connected to server\n");
+        overview.append("LOCAL_ID | TYPE | GLOBAL_ID | HOST | CONNECTED");
+        overview.append(host.toString());
+        overview.append("\n");
+        for (AdvertiseDevice curDevice : devices) {
+          overview.append(curDevice.toString());
+          overview.append("\n");
+        }
+      } else {
+        overview.append("Not connected");
+      }
+    } else {
+      overview.append("Not connected");
+    }
+
+    TextView lblSensorlist = (TextView) findViewById(R.id.lblSensorlist);
+    lblSensorlist.setText(overview.toString());
+  }
+
+  public void showDeployConf(View view) {
     TextView lblSensorlist = (TextView) findViewById(R.id.lblSensorlist);
     lblSensorlist.setText(getString(R.string.msg_model, Build.MODEL));
 
@@ -244,34 +308,30 @@ public class MainActivity extends AppCompatActivity {
 
     File filesDir = getApplicationContext().getFilesDir();
     File autodeployFile = new File(filesDir, Const.AUTODEPLOY_FILE);
-    JSONObject readObject = new JSONObject();
-    if (autodeployFile.exists()) {
-      try (InputStream is = new FileInputStream(autodeployFile)) {
-        int size = is.available();
-        byte[] buffer = new byte[size];
-        is.read(buffer);
-        String json = new String(buffer, "UTF-8");
-        try {
-          readObject = new JSONObject(json);
-        } catch (JSONException e) {
-          e.printStackTrace();
-        }
-      } catch (FileNotFoundException e) {
-        e.printStackTrace();
-      } catch (IOException e) {
+    JSONObject deployConf = readJSONFile(autodeployFile);
+
+    if (deployConf != null) {
+      try {
+        appendText += deployConf.toString(4);
+      } catch (JSONException e) {
         e.printStackTrace();
       }
     }
 
-    if(readObject != null) {
-      try {
-        appendText += readObject.toString(4);
+    File globalIdFile = new File(filesDir, Const.GLOBAL_ID_FILE);
+    JSONObject globalIds = readJSONFile(globalIdFile);
+
+    if(globalIds != null){
+      try{
+        appendText += "\n-------------------------------------------------\n";
+        appendText += globalIds.toString(4);
       } catch (JSONException e) {
         e.printStackTrace();
       }
     }
 
     lblSensorlist.append(appendText);
+
 
 //    mSensorManager = (SensorManager) getSystemService(Context.SENSOR_SERVICE);
 //    List<Sensor> sensors = mSensorManager.getSensorList(Sensor.TYPE_ALL);
@@ -294,18 +354,28 @@ public class MainActivity extends AppCompatActivity {
 //        lblSensorlist.setText(sb);
   }
 
-  private InetAddress getBroadcastAddress() throws IOException {
-    WifiManager wifi = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-    DhcpInfo dhcp = wifi.getDhcpInfo();
-    if(dhcp != null) {
-      // handle null somehow
+  private JSONObject readJSONFile(File file){
+    File filesDir = getFilesDir();
 
-      int broadcast = (dhcp.ipAddress & dhcp.netmask) | ~dhcp.netmask;
-      byte[] quads = new byte[4];
-      for (int k = 0; k < 4; k++)
-        quads[k] = (byte) (broadcast >> (k * 8));
-      return InetAddress.getByAddress(quads);
+    JSONObject readObject = null;
+    if (file.exists()) {
+      try (InputStream is = new FileInputStream(file)) {
+        int size = is.available();
+        byte[] buffer = new byte[size];
+        is.read(buffer);
+        String json = new String(buffer, "UTF-8");
+        try {
+          readObject = new JSONObject(json);
+        } catch (JSONException e) {
+          Log.e(TAG, "Could not parse JSON from file |" + file.getName() + "|");
+        }
+      } catch (FileNotFoundException e) {
+        Log.e(TAG, "Could not find file |" + file.getName() + "|", e);
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
     }
-    return null;
+
+    return readObject;
   }
 }

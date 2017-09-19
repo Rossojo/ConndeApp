@@ -206,8 +206,9 @@ public class AdvertiseService {
     File globalIdFile = new File(filesDir, Const.GLOBAL_ID_FILE);
     try(OutputStream os = new FileOutputStream(globalIdFile)){
       JSONObject writeObject = new JSONObject();
-      for(String localId: devices.keySet()){
-        int globalId = devices.get(localId).getGlobalId();
+      Map<String, AdvertiseDevice> allDevices = getAllDevices();
+      for(String localId: allDevices.keySet()){
+        int globalId = allDevices.get(localId).getGlobalId();
         if(globalId > 0){
           writeObject.put(localId, globalId);
         }
@@ -249,11 +250,11 @@ public class AdvertiseService {
     }
   }
 
-  AdvertiseDevice getHost() {
+  public AdvertiseDevice getHost() {
     return host;
   }
 
-  Map<String, AdvertiseDevice> getDevices() {
+  public Map<String, AdvertiseDevice> getDevices() {
     return devices;
   }
 
