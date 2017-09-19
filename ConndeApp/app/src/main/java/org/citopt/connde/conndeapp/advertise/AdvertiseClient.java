@@ -77,6 +77,9 @@ public abstract class AdvertiseClient {
 
     // send hello message
     JSONObject hello_msg = new JSONObject();
+    if(global_id>0){
+      hello_msg.put(Const.GLOBAL_ID, global_id);
+    }
     hello_msg.put(Const.DEV_IP, ip.toString());
     hello_msg.put(Const.DEV_HW_ADDRESS, hw_addr.toLowerCase());
     hello_msg.put(Const.DEV_TYPE, device.getType());
