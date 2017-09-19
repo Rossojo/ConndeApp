@@ -2,7 +2,7 @@
     <appender name="logcat"
               class="ch.qos.logback.classic.android.LogcatAppender">
         <tagEncoder>
-            <pattern>%logger{0}</pattern>
+            <pattern>%logger{0}:%line</pattern>
         </tagEncoder>
         <encoder>
             <pattern>%d [%thread] |%-5level| %msg</pattern>
