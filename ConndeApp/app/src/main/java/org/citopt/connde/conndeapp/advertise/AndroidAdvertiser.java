@@ -44,7 +44,7 @@ public class AndroidAdvertiser extends AdvertiseClient {
       throw new InternalError("No server address set");
     }
     String stringMsg = msg.toString();
-    log.debug("Sending message |{}| to |{}|", stringMsg, getServer_address().toString());
+    log.debug("Sending message |{}| to |{}|", stringMsg, InetHelper.getStringFor(getServer_address()));
     byte[] raw_msg = stringMsg.getBytes(Charset.forName("UTF-8"));
     try {
       DatagramPacket packet = new DatagramPacket(raw_msg, raw_msg.length, getServer_address(), Const.PORT);
@@ -63,7 +63,7 @@ public class AndroidAdvertiser extends AdvertiseClient {
     try {
       socket.receive(receivedPacket);
       String stringMsg = new String(rawMsg, Charset.forName("UTF-8"));
-      log.debug("Recieved message |{}| from |{}|", stringMsg, receivedPacket.getAddress().toString());
+      log.debug("Recieved message |{}| from |{}|", stringMsg, InetHelper.getStringFor(receivedPacket.getAddress()));
 
       return new JSONObject(stringMsg);
     } catch (SocketTimeoutException e){
@@ -103,7 +103,7 @@ public class AndroidAdvertiser extends AdvertiseClient {
           broadcastAddress = curIntAddr.getBroadcast();
           if(ownIp != null) {
             if (broadcastAddress != null) {
-              log.info("Broadcasting to |{}|", broadcastAddress.toString());
+              log.info("Broadcasting to |{}|", InetHelper.getStringFor(broadcastAddress));
               discoveredServer = pingServer(ownIp, ownMac, broadcastAddress);
             } else {
               log.info("Connecting to hardcoded ip |127.0.0.1|");
