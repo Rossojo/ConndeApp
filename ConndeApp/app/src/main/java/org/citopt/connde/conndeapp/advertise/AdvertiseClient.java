@@ -99,6 +99,9 @@ public abstract class AdvertiseClient {
       if (hello_reply.has(Const.ERROR) && global_id <= 0) {
         log.info("Could not connect device |{}|. Reason |{}|", device.getLocalId(), hello_reply.getString(Const.ERROR));
       }
+    }else{
+      log.error("No response on hello_message. No connection possible");
+      global_id = 0;
     }
 
     if (global_id > 0) {
@@ -154,10 +157,11 @@ public abstract class AdvertiseClient {
         }
 
         global_id = this.connect_device(host, this.ip, this.hw_addr, global_id);
+
+        this.service.setConnected(host.getLocalId(), global_id>0);
+        this.service.setGlobalId(host.getLocalId(), global_id);
         if (global_id > 0) {
           log.info("Connected device |{}| with GLOBAL_ID |{}|", host.getLocalId(), global_id);
-          this.service.setConnected(host.getLocalId(), true);
-          this.service.setGlobalId(host.getLocalId(), global_id);
         } else {
           log.error("Could not connect host. Aborting advertising...");
           return;
@@ -181,10 +185,12 @@ public abstract class AdvertiseClient {
           log.info("Connecting device |{}|", device.getLocalId());
         }
         global_id = this.connect_device(device, this.ip, this.hw_addr, global_id);
+        this.service.setConnected(device.getLocalId(), global_id>0);
+        this.service.setGlobalId(device.getLocalId(), global_id);
         if (global_id > 0) {
           log.info("Connected device |{}| with GLOBAL_ID |{}|", device.getLocalId(), global_id);
-          this.service.setConnected(device.getLocalId(), true);
-          this.service.setGlobalId(device.getLocalId(), global_id);
+        } else{
+          log.warn("Failed to connect device |{}|");
         }
       }
     }
