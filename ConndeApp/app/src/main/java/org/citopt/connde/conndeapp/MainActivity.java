@@ -67,11 +67,20 @@ public class MainActivity extends AppCompatActivity {
   }
 
   @Override
+  protected void onResume() {
+    super.onResume();
+    String buttonText = advertiseService == null ? getString(R.string.btn_startAdvertising) : getString(R.string.btn_stopAdvertising);
+    Button toggleButton = (Button) findViewById(R.id.btnToggleAdvertise);
+    toggleButton.setText(buttonText);
+  }
+
+  @Override
   protected void onPause() {
     super.onPause();
     if (advertiseService != null) {
       try {
         advertiseService.stop();
+        advertiseService = null;
       } catch (JSONException e) {
         Log.e(TAG, "Error stopping advertise service");
       }
@@ -321,8 +330,8 @@ public class MainActivity extends AppCompatActivity {
     File globalIdFile = new File(filesDir, Const.GLOBAL_ID_FILE);
     JSONObject globalIds = readJSONFile(globalIdFile);
 
-    if(globalIds != null){
-      try{
+    if (globalIds != null) {
+      try {
         appendText += "\n-------------------------------------------------\n";
         appendText += globalIds.toString(4);
       } catch (JSONException e) {
@@ -354,7 +363,7 @@ public class MainActivity extends AppCompatActivity {
 //        lblSensorlist.setText(sb);
   }
 
-  private JSONObject readJSONFile(File file){
+  private JSONObject readJSONFile(File file) {
     File filesDir = getFilesDir();
 
     JSONObject readObject = null;
