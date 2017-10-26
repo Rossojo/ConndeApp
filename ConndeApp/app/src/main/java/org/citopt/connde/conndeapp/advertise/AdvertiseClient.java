@@ -32,30 +32,6 @@ public abstract class AdvertiseClient {
 
   protected abstract DiscoveredServer discover_server();
 
-  protected static class DiscoveredServer{
-    private InetAddress serverAddress;
-    private InetAddress ownAddress;
-    private String macAddress;
-
-    public DiscoveredServer(InetAddress serverAddress, InetAddress ownAddress, String macAddress) {
-      this.serverAddress = serverAddress;
-      this.ownAddress = ownAddress;
-      this.macAddress = macAddress;
-    }
-
-    public InetAddress getServerAddress() {
-      return serverAddress;
-    }
-
-    public InetAddress getOwnAddress() {
-      return ownAddress;
-    }
-
-    public String getMacAddress() {
-      return macAddress;
-    }
-  }
-
   protected InetAddress getServer_address() {
     return server_address;
   }
@@ -73,7 +49,7 @@ public abstract class AdvertiseClient {
   }
 
   private int connect_device(AdvertiseDevice device, InetAddress ip, String hw_addr, int global_id) throws JSONException {
-    // TODO client - do not send adapter config upon reconnect
+    // TODO client - do not send adapter config upon reconnect?
 
     // send hello message
     JSONObject hello_msg = new JSONObject();
@@ -121,17 +97,23 @@ public abstract class AdvertiseClient {
       if (ack == null || !ack.has(Const.GLOBAL_ID) || ack.getInt(Const.GLOBAL_ID) != global_id) {
         log.debug("Did not recieve valid ACK. Treating device as unconnected");
         global_id = 0;  // treat as unconnected
+      }else if(ack.has(Const.CONNDE_ID)){
+        String conndeId = ack.getString(Const.CONNDE_ID);
+        if(conndeId != null && !conndeId.isEmpty()){
+          device.setConndeId(conndeId);
+        }
       }
     }
     return global_id;
   }
 
-  void advertise() throws JSONException {
+  DiscoveredServer advertise() throws JSONException {
     int tries = 0;
+    DiscoveredServer server = null;
     while (this.server_address == null && tries < 5) {
       tries++;
       log.debug("discovering server; try |{}|", tries);
-      DiscoveredServer server = this.discover_server();
+      server = this.discover_server();
       if (server != null) {
         this.server_address = server.getServerAddress();
         this.ip = server.getOwnAddress();
@@ -144,7 +126,7 @@ public abstract class AdvertiseClient {
       }
     }
 
-    log.info("Server found @ |{}| after |{}| tries", this.server_address, tries);
+    log.info("Server found @ |{}| after |{}| tries", InetHelper.getStringFor(this.server_address), tries);
 
     if (this.server_address != null) {
       AdvertiseDevice host = this.service.getHost();
@@ -164,7 +146,7 @@ public abstract class AdvertiseClient {
           log.info("Connected device |{}| with GLOBAL_ID |{}|", host.getLocalId(), global_id);
         } else {
           log.error("Could not connect host. Aborting advertising...");
-          return;
+          return null;
         }
       }
 
@@ -194,5 +176,7 @@ public abstract class AdvertiseClient {
         }
       }
     }
+
+    return server;
   }
 }

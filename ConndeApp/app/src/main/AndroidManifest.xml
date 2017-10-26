@@ -18,6 +18,8 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service android:name=".AdvertiserService" android:description="@string/msg_serviceAdvertiseDescription" android:exported="false"/>
+        <service android:name=".MqttService" android:exported="false"/>
     </application>
 
 </manifest>

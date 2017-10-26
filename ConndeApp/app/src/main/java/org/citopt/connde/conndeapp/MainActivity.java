@@ -1,17 +1,14 @@
 package org.citopt.connde.conndeapp;
 
-import android.content.BroadcastReceiver;
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
+import android.content.ServiceConnection;
 import android.hardware.Sensor;
 import android.hardware.SensorManager;
-import android.net.DhcpInfo;
-import android.net.NetworkInfo;
-import android.net.wifi.ScanResult;
-import android.net.wifi.WifiManager;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
 import android.view.View;
@@ -19,46 +16,51 @@ import android.widget.Button;
 import android.widget.TextView;
 
 import org.citopt.connde.conndeapp.advertise.AdvertiseDevice;
-import org.citopt.connde.conndeapp.advertise.AdvertiseService;
 import org.citopt.connde.conndeapp.advertise.Const;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
-import java.net.InetAddress;
 import java.nio.charset.Charset;
 import java.util.Collection;
 import java.util.List;
+
+import static org.citopt.connde.conndeapp.helper.RMPHelper.getStringType;
+import static org.citopt.connde.conndeapp.helper.RMPHelper.readJSONFile;
 
 public class MainActivity extends AppCompatActivity {
   private static final String TAG = "ConndeMain";
   private SensorManager mSensorManager;
 
-  private String curSsid;
-  private AdvertiseService advertiseService;
+  private AdvertiserService advertiserService;
+
+  private ServiceConnection advertiseConnection = new ServiceConnection() {
+    @Override
+    public void onServiceConnected(ComponentName componentName, IBinder iBinder) {
+      advertiserService = ((AdvertiserService.AdvertiseBinder) iBinder).getService();
+      Log.i(TAG, "Connected to running AdvertiserService |" + advertiserService.isStarted() + "|");
+      String buttonText = isAdvertising() ? getString(R.string.btn_stopAdvertising) : getString(R.string.btn_startAdvertising);
+      Button toggleButton = (Button) findViewById(R.id.btnToggleAdvertise);
+      toggleButton.setText(buttonText);
+    }
+
+    @Override
+    public void onServiceDisconnected(ComponentName componentName) {
+      advertiserService = null;
+      Log.i(TAG, "Disconnected from AdvertiserService");
+    }
+  };
 
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.activity_main);
-    Log.i(TAG, "Registering Broadcast receiver");
-    IntentFilter intentFilter = new IntentFilter();
-    intentFilter.addAction(WifiManager.NETWORK_STATE_CHANGED_ACTION);
-    registerReceiver(new BroadcastReceiver() {
-      @Override
-      public void onReceive(Context context, Intent intent) {
-        wifiConnectionChanged(context, intent);
-      }
-    }, intentFilter);
-
     try {
       ensureAutodeployConf();
     } catch (JSONException e) {
@@ -69,22 +71,24 @@ public class MainActivity extends AppCompatActivity {
   @Override
   protected void onResume() {
     super.onResume();
-    String buttonText = advertiseService == null ? getString(R.string.btn_startAdvertising) : getString(R.string.btn_stopAdvertising);
-    Button toggleButton = (Button) findViewById(R.id.btnToggleAdvertise);
-    toggleButton.setText(buttonText);
+    bindService(new Intent(this, AdvertiserService.class), advertiseConnection, Context.BIND_AUTO_CREATE);
   }
 
   @Override
   protected void onPause() {
     super.onPause();
-    if (advertiseService != null) {
-      try {
-        advertiseService.stop();
-        advertiseService = null;
-      } catch (JSONException e) {
-        Log.e(TAG, "Error stopping advertise service");
-      }
+    unbindFromService();
+  }
+
+  private void unbindFromService(){
+    if(advertiserService!=null) {
+      unbindService(advertiseConnection);
+      advertiserService = null;
     }
+  }
+
+  private boolean isAdvertising(){
+    return advertiserService!=null&&advertiserService.isStarted();
   }
 
   private void ensureAutodeployConf() throws JSONException {
@@ -103,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
       host.put(Const.TYPE, Build.MODEL);
 
       JSONObject hostAdapterConf = new JSONObject();
-      hostAdapterConf.put(Const.TIMEOUT, 30); // default 30 seconds
+      hostAdapterConf.put(Const.TIMEOUT, 15); // default 30 seconds
       host.put(Const.ADAPTER_CONF, hostAdapterConf);
 
       autodeployConf.put(Const.DEPLOY_SELF, host);
@@ -137,157 +141,23 @@ public class MainActivity extends AppCompatActivity {
     }
   }
 
-  private String getStringType(int sensorType) {
-    switch (sensorType) {
-      case Sensor.TYPE_ACCELEROMETER:
-        return Sensor.STRING_TYPE_ACCELEROMETER;
-      case Sensor.TYPE_ACCELEROMETER_UNCALIBRATED:
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-          return Sensor.STRING_TYPE_ACCELEROMETER_UNCALIBRATED;
-        } else {
-          return "android.sensor.accelerometer_uncalibrated";
-        }
-      case Sensor.TYPE_AMBIENT_TEMPERATURE:
-        return Sensor.STRING_TYPE_AMBIENT_TEMPERATURE;
-      case Sensor.TYPE_DEVICE_PRIVATE_BASE:
-        return "Unknown Sensor type |Device_Private_Base|";
-      case Sensor.TYPE_GAME_ROTATION_VECTOR:
-        return Sensor.STRING_TYPE_GAME_ROTATION_VECTOR;
-      case Sensor.TYPE_GEOMAGNETIC_ROTATION_VECTOR:
-        return Sensor.STRING_TYPE_GEOMAGNETIC_ROTATION_VECTOR;
-      case Sensor.TYPE_GRAVITY:
-        return Sensor.STRING_TYPE_GRAVITY;
-      case Sensor.TYPE_GYROSCOPE:
-        return Sensor.STRING_TYPE_GYROSCOPE;
-      case Sensor.TYPE_GYROSCOPE_UNCALIBRATED:
-        return Sensor.STRING_TYPE_GYROSCOPE_UNCALIBRATED;
-      case Sensor.TYPE_HEART_BEAT:
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-          return Sensor.STRING_TYPE_HEART_BEAT;
-        } else {
-          return "android.sensor.heart_beat";
-        }
-      case Sensor.TYPE_HEART_RATE:
-        return Sensor.STRING_TYPE_HEART_RATE;
-      case Sensor.TYPE_LIGHT:
-        return Sensor.STRING_TYPE_LIGHT;
-      case Sensor.TYPE_LINEAR_ACCELERATION:
-        return Sensor.STRING_TYPE_LINEAR_ACCELERATION;
-      case Sensor.TYPE_LOW_LATENCY_OFFBODY_DETECT:
-        return Sensor.STRING_TYPE_LOW_LATENCY_OFFBODY_DETECT;
-      case Sensor.TYPE_MAGNETIC_FIELD:
-        return Sensor.STRING_TYPE_MAGNETIC_FIELD;
-      case Sensor.TYPE_MAGNETIC_FIELD_UNCALIBRATED:
-        return Sensor.STRING_TYPE_MAGNETIC_FIELD_UNCALIBRATED;
-      case Sensor.TYPE_MOTION_DETECT:
-        return Sensor.STRING_TYPE_MOTION_DETECT;
-      case Sensor.TYPE_ORIENTATION:
-        return Sensor.STRING_TYPE_ORIENTATION;
-      case Sensor.TYPE_POSE_6DOF:
-        return Sensor.STRING_TYPE_POSE_6DOF;
-      case Sensor.TYPE_PRESSURE:
-        return Sensor.STRING_TYPE_PRESSURE;
-      case Sensor.TYPE_PROXIMITY:
-        return Sensor.STRING_TYPE_PROXIMITY;
-      case Sensor.TYPE_RELATIVE_HUMIDITY:
-        return Sensor.STRING_TYPE_RELATIVE_HUMIDITY;
-      case Sensor.TYPE_ROTATION_VECTOR:
-        return Sensor.STRING_TYPE_ROTATION_VECTOR;
-      case Sensor.TYPE_SIGNIFICANT_MOTION:
-        return Sensor.STRING_TYPE_SIGNIFICANT_MOTION;
-      case Sensor.TYPE_STATIONARY_DETECT:
-        return Sensor.STRING_TYPE_STATIONARY_DETECT;
-      case Sensor.TYPE_STEP_COUNTER:
-        return Sensor.STRING_TYPE_STEP_COUNTER;
-      case Sensor.TYPE_STEP_DETECTOR:
-        return Sensor.STRING_TYPE_STEP_DETECTOR;
-      case Sensor.TYPE_TEMPERATURE:
-        return Sensor.STRING_TYPE_TEMPERATURE;
-      default:
-        Log.w(TAG, "Could not translate Sensor Type |" + sensorType + "|");
-        return "Unknown Sensor Type |" + sensorType + "|";
-    }
-  }
-
-  public void wifiConnectionChanged(Context context, Intent intent) {
-    final String action = intent.getAction();
-    if (action.equals(WifiManager.NETWORK_STATE_CHANGED_ACTION)) {
-      NetworkInfo netInfo = intent.getParcelableExtra(WifiManager.EXTRA_NETWORK_INFO);
-      if (netInfo.getState() == NetworkInfo.State.CONNECTED) {
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-        String ssid = wifiManager.getConnectionInfo().getSSID();
-        if (ssid != null && !ssid.equals(curSsid)) {
-          Log.i(TAG, "Connected to |" + ssid + "|");
-          curSsid = ssid;
-//          try {
-//            advertiseService = new AdvertiseService(getFilesDir());
-//          } catch (JSONException e) {
-//            Log.e(TAG, "Error constructing advertising service", e);
-//          }
-//          new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//              try {
-//                advertiseService.start("android");
-//              } catch (JSONException e) {
-//                Log.e(TAG, "Error starting advertising service", e);
-//              }
-//            }
-//          }).start();
-        }
-      } else {
-        Log.d(TAG, "No Connection");
-        curSsid = null;
-//        if (advertiseService != null) {
-//          try {
-//            advertiseService.stop();
-//          } catch (JSONException e) {
-//            Log.e(TAG, "Error stopping advertising service", e);
-//          }
-//        }
-      }
-    }
-  }
-
   public void toggleAdvertising(View view) {
-    if (advertiseService == null) {
-      try {
-        advertiseService = new AdvertiseService(getFilesDir());
-        new Thread(new Runnable() {
-          @Override
-          public void run() {
-            try {
-              advertiseService.start("android");
-            } catch (JSONException e) {
-              Log.e(TAG, "Error starting advertising service", e);
-            }
-          }
-        }).start();
-
-        ((Button) view).setText(getString(R.string.btn_stopAdvertising));
-      } catch (JSONException e) {
-        Log.e(TAG, "Error constructing advertising service", e);
-      }
+    if (isAdvertising()) {
+      unbindFromService();
+      stopService(new Intent(this, AdvertiserService.class));
+      ((Button) view).setText(getString(R.string.btn_startAdvertising));
     } else {
-      try {
-        advertiseService.stop();
-        advertiseService = null;
-        ((Button) view).setText(getString(R.string.btn_startAdvertising));
-      } catch (JSONException e) {
-        Log.e(TAG, "Error stopping advertising service", e);
-      }
+      startService(new Intent(this, AdvertiserService.class));
+      bindService(new Intent(this, AdvertiserService.class), advertiseConnection, Context.BIND_AUTO_CREATE);
+      ((Button) view).setText(getString(R.string.btn_stopAdvertising));
     }
-
-    String buttonText = advertiseService == null ? getString(R.string.btn_startAdvertising) : getString(R.string.btn_stopAdvertising);
-    Button toggleButton = (Button) findViewById(R.id.btnToggleAdvertise);
-    toggleButton.setText(buttonText);
   }
 
   public void showSensorOverview(View view) {
     StringBuilder overview = new StringBuilder();
-    if (advertiseService != null) {
-      AdvertiseDevice host = advertiseService.getHost();
-      Collection<AdvertiseDevice> devices = advertiseService.getDevices().values();
+    if (isAdvertising()) {
+      AdvertiseDevice host = advertiserService.getHost();
+      Collection<AdvertiseDevice> devices = advertiserService.getDevices().values();
 
       if (host != null && host.isConnected()) {
         overview.append("Connected to server\n");
@@ -361,30 +231,5 @@ public class MainActivity extends AppCompatActivity {
 //                "Your host is: \t\t" + Build.HOST + "\n" +
 //                "Your user is: \t\t" + Build.USER + "\n";
 //        lblSensorlist.setText(sb);
-  }
-
-  private JSONObject readJSONFile(File file) {
-    File filesDir = getFilesDir();
-
-    JSONObject readObject = null;
-    if (file.exists()) {
-      try (InputStream is = new FileInputStream(file)) {
-        int size = is.available();
-        byte[] buffer = new byte[size];
-        is.read(buffer);
-        String json = new String(buffer, "UTF-8");
-        try {
-          readObject = new JSONObject(json);
-        } catch (JSONException e) {
-          Log.e(TAG, "Could not parse JSON from file |" + file.getName() + "|");
-        }
-      } catch (FileNotFoundException e) {
-        Log.e(TAG, "Could not find file |" + file.getName() + "|", e);
-      } catch (IOException e) {
-        e.printStackTrace();
-      }
-    }
-
-    return readObject;
   }
 }

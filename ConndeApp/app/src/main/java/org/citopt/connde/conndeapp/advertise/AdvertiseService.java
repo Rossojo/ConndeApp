@@ -16,6 +16,8 @@ import java.io.OutputStream;
 import java.nio.charset.Charset;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -27,6 +29,8 @@ public class AdvertiseService {
   private static final Logger log = LoggerFactory.getLogger(AdvertiseService.class);
 
   private Map<String, AdvertiseDevice> devices; // TODO include host in devices?
+  private DiscoveredServer discoveredServer;
+  private List<ServerDiscoveredListener> discoveredListeners = new LinkedList<>();
 
   private JSONObject autodeploy_data;
   private AdvertiseDevice host;
@@ -79,7 +83,7 @@ public class AdvertiseService {
     }
 
     Iterator<String> keys = readObject.keys();
-    while (keys.hasNext()){
+    while (keys.hasNext()) {
       String localId = keys.next();
       int globalId = readObject.getInt(localId);
 
@@ -127,6 +131,8 @@ public class AdvertiseService {
   private boolean check_connected() {
     boolean connected = true;
 
+    connected = discoveredServer != null;
+
     if (host != null && !host.isConnected()) {
       connected = false;
     }
@@ -151,7 +157,10 @@ public class AdvertiseService {
     while (!connected && tries < 5) {
       tries += 1;
       log.debug("advertising try |{}|", tries);
-      advertiser.advertise();
+      DiscoveredServer newDiscoveredServer = advertiser.advertise();
+      if (newDiscoveredServer != null) {
+        setDiscoveredServer(newDiscoveredServer);
+      }
       connected = this.check_connected();
     }
 
@@ -183,9 +192,9 @@ public class AdvertiseService {
         long passed_time = cur_time - last_contact;
         double max_passed_time = timeout - this.min_timeout;
         log.debug("Checking device |{}|. " +
-                "\nTimeout is |{}|, min timeout is |{}|, max passed time is |{}|," +
-                "\nlast contact at |{}|, now is |{}|, passed time is |{}|," +
-                "\nneed keep alive |{}|",
+                        "\nTimeout is |{}|, min timeout is |{}|, max passed time is |{}|," +
+                        "\nlast contact at |{}|, now is |{}|, passed time is |{}|," +
+                        "\nneed keep alive |{}|",
                 device_name, timeout, this.min_timeout, max_passed_time, last_contact,
                 cur_time, passed_time, String.valueOf(passed_time >= max_passed_time));
         if (passed_time >= max_passed_time) {
@@ -204,12 +213,12 @@ public class AdvertiseService {
   public void stop() throws JSONException {
     keepalive.set(false);
     File globalIdFile = new File(filesDir, Const.GLOBAL_ID_FILE);
-    try(OutputStream os = new FileOutputStream(globalIdFile)){
+    try (OutputStream os = new FileOutputStream(globalIdFile)) {
       JSONObject writeObject = new JSONObject();
       Map<String, AdvertiseDevice> allDevices = getAllDevices();
-      for(String localId: allDevices.keySet()){
+      for (String localId : allDevices.keySet()) {
         int globalId = allDevices.get(localId).getGlobalId();
-        if(globalId > 0){
+        if (globalId > 0) {
           writeObject.put(localId, globalId);
         }
       }
@@ -224,18 +233,18 @@ public class AdvertiseService {
 
   void setGlobalId(String deviceName, int globalId) {
     AdvertiseDevice device = devices.get(deviceName);
-    if(device != null) {
+    if (device != null) {
       device.setGlobalId(globalId);
-    } else if(host!=null && host.getLocalId().equals(deviceName)){
+    } else if (host != null && host.getLocalId().equals(deviceName)) {
       host.setGlobalId(globalId);
     }
   }
 
   int getGlobalId(String deviceName) {
     AdvertiseDevice device = devices.get(deviceName);
-    if(device != null) {
+    if (device != null) {
       return device.getGlobalId();
-    } else if(host!=null && host.getLocalId().equals(deviceName)){
+    } else if (host != null && host.getLocalId().equals(deviceName)) {
       return host.getGlobalId();
     }
     return -1;
@@ -243,9 +252,9 @@ public class AdvertiseService {
 
   void setConnected(String deviceName, boolean connected) {
     AdvertiseDevice device = devices.get(deviceName);
-    if(device != null) {
+    if (device != null) {
       device.setConnected(connected);
-    }else if(host != null && host.getLocalId().equals(deviceName)){
+    } else if (host != null && host.getLocalId().equals(deviceName)) {
       host.setConnected(connected);
     }
   }
@@ -258,15 +267,33 @@ public class AdvertiseService {
     return devices;
   }
 
-  Map<String, AdvertiseDevice> getAllDevices(){
-    if(host != null){
+  Map<String, AdvertiseDevice> getAllDevices() {
+    if (host != null) {
       Map<String, AdvertiseDevice> allDevices = new HashMap<>(devices);
       allDevices.put(host.getLocalId(), host);
       return allDevices;
-    }else{
+    } else {
       return devices;
     }
 
   }
 
+  private void setDiscoveredServer(DiscoveredServer newDiscoveredServer) {
+    discoveredServer = newDiscoveredServer;
+    for (ServerDiscoveredListener curListener : discoveredListeners) {
+      curListener.onServerDiscovered(new ServerDiscoveredListener.ServerDiscoveredEvent(discoveredServer));
+    }
+  }
+
+  public DiscoveredServer getDiscoveredServer() {
+    return discoveredServer;
+  }
+
+  public void addDiscoveredListener(ServerDiscoveredListener listener) {
+    discoveredListeners.add(listener);
+  }
+
+  public void removeDiscoveredListener(ServerDiscoveredListener listener) {
+    discoveredListeners.remove(listener);
+  }
 }

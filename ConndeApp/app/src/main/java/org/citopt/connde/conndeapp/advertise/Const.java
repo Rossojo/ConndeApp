@@ -15,6 +15,7 @@ public interface Const {
   String PING_MSG = "ping_msg";
   String HOST = "host";
   String ERROR = "error";
+  String CONNDE_ID = "conndeId";
 
   // Connection types
   String CONN_HELLO = "hello";
@@ -35,6 +36,8 @@ public interface Const {
   // other stuff
   String ENCODING = "utf-8";
   String LAST_CONTACT = "last_contact";
+  String CONNDE_SENSOR_CATEGORY = "SENSOR";
+  String CONNDE_ACTUATOR_CATEGORY = "ACTUATOR";
 
   // bluetooth server constants
   String BT_UUID = "809a061f-d834-4ba6-8741-29f0f53ca1b9";
@@ -55,5 +58,10 @@ public interface Const {
   String CLIENT_CMD_ARG = "advertiser_class";
 
   String GLOBAL_ID_FILE = "global_ids.json";
+
+  // MQTT constants
+  String MQTT_COMPONENT = "component";
+  String MQTT_ID = "id";
+  String MQTT_VALUE = "value";
 
 }

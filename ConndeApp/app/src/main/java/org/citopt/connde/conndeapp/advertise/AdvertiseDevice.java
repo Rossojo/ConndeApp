@@ -13,6 +13,7 @@ public class AdvertiseDevice {
   private Map<String, Object> adapterConf;
   private long lastKeepalive;
   private boolean connected;
+  private String conndeId;
 
   private AdvertiseDevice host;
 
@@ -98,6 +99,14 @@ public class AdvertiseDevice {
 
   public void setType(String type) {
     this.type = type;
+  }
+
+  public String getConndeId() {
+    return conndeId;
+  }
+
+  public void setConndeId(String conndeId) {
+    this.conndeId = conndeId;
   }
 
   @Override

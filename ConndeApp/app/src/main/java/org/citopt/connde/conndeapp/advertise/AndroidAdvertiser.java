@@ -145,7 +145,7 @@ public class AndroidAdvertiser extends AdvertiseClient {
         JSONObject answerMsg = new JSONObject(stringAnswer);
         if (answerMsg.has(Const.PING_MSG) && answerMsg.getString(Const.PING_MSG).equals("pong")) {
           InetAddress serverAddress = answer.getAddress();
-          log.info("Server found at |{}|", serverAddress.toString());
+          log.info("Server found at |{}|", InetHelper.getStringFor(serverAddress));
           DiscoveredServer discoveredServer = new DiscoveredServer(serverAddress, ownIp, ownMac);
           return discoveredServer;
         }
